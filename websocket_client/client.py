@@ -1,5 +1,7 @@
 import asyncio
 import websockets
+import json
+
 
 # Function to handle the chat client
 async def connect_to_server():
@@ -10,10 +12,13 @@ async def connect_to_server():
 
         try:
             while True:
-                # Receive the reversed message from the server
-                reversed_message = await websocket.recv()
-                print(f"Received reversed message: {reversed_message}")
+                # Receive the response message from the server
+                response = await websocket.recv()
 
+                # Parse the text into json
+                parsed_data = json.loads(response)
+                print(f"json response {parsed_data}")
+                
         except Exception as e:
             print(f"An error occurred: {e}")
 
