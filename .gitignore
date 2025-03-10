@@ -215,4 +215,5 @@ DerivedData/
 .history
 .ionide
 
+scripts/state/
 # End of https://www.toptal.com/developers/gitignore/api/swiftpackagemanager,linux,visualstudiocode,python
