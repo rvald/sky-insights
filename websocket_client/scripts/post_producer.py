@@ -32,30 +32,81 @@ class PostProducer:
         try:
 
             async for message in self.client.messages():
-            
-                message_key = str(uuid.uuid4())
-                message_data = json.dumps(message)
 
-                # IMPORTANT: await the async database call
-                await self.hybrid_logger.add_event(
-                    message_key,
-                    message_data.encode('utf-8')
-                )
+                target_keys = [
+                    'did',
+                    'time_us',
+                    'kind',
+                    'cid',
+                    'operation',
+                    'created_at',
+                    'createdAt',
+                    'langs',
+                    'text'
+                ]
 
-                # If post_producer.send_message is sync, this is fine;
-                # otherwise, you may also need to await it if it's async.
-                await self.send_message(message_key, message_data)
+                extracted_values = await self.find_keys(message, target_keys)
 
+                if extracted_values["kind"][0] == "commit" and extracted_values["operation"] is not None and extracted_values["operation"][0] == "create":
+                    
+                    if len(extracted_values["created_at"]) == 0:
+                        created_at = extracted_values["createdAt"][0]
+                    else:
+                        created_at = extracted_values["created_at"][0]
+
+                    post_dict = {
+                        'did':        extracted_values["did"][0] if extracted_values.get("did") and len(extracted_values["did"]) > 0 and extracted_values["did"][0] != "" else None,
+                        'time_us':    extracted_values["time_us"][0] if extracted_values.get("time_us") and len(extracted_values["time_us"]) > 0 and extracted_values["time_us"][0] != "" else None,
+                        'kind':       extracted_values["kind"][0] if extracted_values.get("kind") and len(extracted_values["kind"]) > 0 and extracted_values["kind"][0] != "" else None,
+                        'cid':        extracted_values["cid"][0] if extracted_values.get("cid") and len(extracted_values["cid"]) > 0 and extracted_values["cid"][0] != "" else None,
+                        'operation':  extracted_values["operation"][0] if extracted_values.get("operation") and len(extracted_values["operation"]) > 0 and extracted_values["operation"][0] != "" else None,
+                        'created_at': created_at,
+                        'langs':      extracted_values["langs"][0] if extracted_values.get("langs") and len(extracted_values["langs"]) > 0 and extracted_values["langs"][0] != "" else None,
+                        'text':       extracted_values["text"][0] if extracted_values.get("text") and len(extracted_values["text"]) > 0 and extracted_values["text"][0] != "" else None,
+                    }
+
+                    message_key = str(uuid.uuid4())
+                    message_data = json.dumps(post_dict)
+
+                    # IMPORTANT: await the async database call
+                    await self.hybrid_logger.add_event(
+                        message_key,
+                        message_data.encode('utf-8')
+                    )
+
+                    # If post_producer.send_message is sync, this is fine;
+                    # otherwise, you may also need to await it if it's async.
+                    await self.send_message(message_key, post_dict)
+
+                
         except Exception as err:
-            print(f"An error occurred connectiing to socket: {err}")
+            print(f"An error occurred connecting to socket: {err} for value {message} and extracted - {extracted_values}")
 
-    def parse_response(self, response):
-        """Parse the response from the server into JSON format."""
-        try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            print("Failed to parse response as JSON")
-            return None
+    async def find_keys(self, data, target_keys):
+        """
+        Recursively search the JSON-like dict (or list) for keys in target_keys.
+        Returns a dictionary mapping each target key to a list of all found values.
+        
+        :param data: JSON object as a dict (or list) to search.
+        :param target_keys: A list of keys to search for.
+        :return: A dict {key: [found_value1, found_value2, ...], ...}
+        """
+        # Initialize the result dictionary, one empty list for each target key.
+        found = {key: [] for key in target_keys}
+        
+        def recursive_search(current):
+            if isinstance(current, dict):
+                for k, v in current.items():
+                    if k in target_keys:
+                        found[k].append(v)
+                    # Recurse into the value
+                    recursive_search(v)
+            elif isinstance(current, list):
+                for item in current:
+                    recursive_search(item)
+        
+        recursive_search(data)
+        return found
 
     async def send_message(self, message_key, message):
         """
@@ -67,6 +118,7 @@ class PostProducer:
                 key=message_key,
                 value=message
             )
+
             print(f"Message with key '{message_key}' sent successfully. Offset={record_meta.offset}")
 
             # If successful and you want to remove the event from the transient DB:

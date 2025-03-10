@@ -207,4 +207,7 @@ pyrightconfig.json
 .history
 .ionide
 
+### SQLite3
+scripts/state/
+
 # End of https://www.toptal.com/developers/gitignore/api/linux,python,visualstudiocode

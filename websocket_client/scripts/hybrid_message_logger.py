@@ -16,6 +16,8 @@ class HybridMessageLogger:
         """
         self.ensure_directories()
 
+        await self.close()
+
         # Connect to SQLite databases asynchronously
         self.transient_conn = await aiosqlite.connect(self.TRANSIENT_DB_PATH)
         self.failed_conn = await aiosqlite.connect(self.FAILED_DB_PATH)
